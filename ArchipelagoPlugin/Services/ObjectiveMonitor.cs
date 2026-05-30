@@ -32,6 +32,7 @@ public sealed class ObjectiveMonitor : IDisposable
     public ObjectiveMonitor(Plugin plugin)
     {
         this.plugin = plugin;
+        Plugin.DutyState.DutyStarted += OnDutyStarted;
         Plugin.DutyState.DutyCompleted += OnDutyCompleted;
     }
 
@@ -48,6 +49,7 @@ public sealed class ObjectiveMonitor : IDisposable
 
     public void Dispose()
     {
+        Plugin.DutyState.DutyStarted -= OnDutyStarted;
         Plugin.DutyState.DutyCompleted -= OnDutyCompleted;
     }
 
@@ -115,6 +117,18 @@ public sealed class ObjectiveMonitor : IDisposable
         {
             AddRecentEvent($"Ignored completed duty: {FormatDutyDetails(completion)}");
         }
+    }
+
+    private void OnDutyStarted(IDutyStateEventArgs args)
+    {
+        var completion = CreateDutyCompletion(args);
+        var message = completion == null
+            ? "Duty started; resetting monitor."
+            : $"Duty started; resetting monitor: {FormatDutyDetails(completion)}";
+
+        AddRecentEvent(message);
+        Plugin.Log.Information(message);
+        plugin.HintRollDisplay.ResetAfterCurrentRoll();
     }
 
     private static DutyCompletion? CreateDutyCompletion(IDutyStateEventArgs args)

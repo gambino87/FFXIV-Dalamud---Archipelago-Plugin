@@ -32,6 +32,11 @@ public sealed class HintRollDisplay : IDisposable
 
     public bool IsBusy => rollLock.CurrentCount == 0;
 
+    public void ResetAfterCurrentRoll()
+    {
+        _ = ResetAfterCurrentRollAsync();
+    }
+
     public async Task RollAndDispatchAsync(
         ObjectiveDefinition objective,
         string details,
@@ -128,6 +133,32 @@ public sealed class HintRollDisplay : IDisposable
                 DateTime.UtcNow,
                 $"Roll failed: {ex.GetBaseException().Message}",
                 string.Empty));
+        }
+        finally
+        {
+            if (lockTaken)
+            {
+                rollLock.Release();
+            }
+        }
+    }
+
+    private async Task ResetAfterCurrentRollAsync()
+    {
+        var lockTaken = false;
+
+        try
+        {
+            await rollLock.WaitAsync(disposeCts.Token);
+            lockTaken = true;
+            SetSnapshot(HintRollDisplaySnapshot.Idle);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "Failed to reset hint roll display.");
         }
         finally
         {
