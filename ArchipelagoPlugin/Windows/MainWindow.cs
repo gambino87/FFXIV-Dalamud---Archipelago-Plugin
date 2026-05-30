@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using ArchipelagoPlugin.Models;
+using ArchipelagoPlugin.Services;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
@@ -219,9 +221,12 @@ public class MainWindow : Window, IDisposable
         const ImGuiTableFlags flags =
             ImGuiTableFlags.Borders |
             ImGuiTableFlags.RowBg |
-            ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.NoSavedSettings |
+            ImGuiTableFlags.ScrollX |
             ImGuiTableFlags.ScrollY |
-            ImGuiTableFlags.SizingStretchProp;
+            ImGuiTableFlags.SizingFixedFit;
+
+        var columnWidths = GetHintColumnWidths(hints);
 
         if (!ImGui.BeginTable("ArchipelagoHintsTable", 6, flags, new Vector2(0, 0)))
         {
@@ -229,12 +234,12 @@ public class MainWindow : Window, IDisposable
         }
 
         ImGui.TableSetupScrollFreeze(0, 1);
-        ImGui.TableSetupColumn("Found");
-        ImGui.TableSetupColumn("Tier");
-        ImGui.TableSetupColumn("Location");
-        ImGui.TableSetupColumn("Item");
-        ImGui.TableSetupColumn("Finder");
-        ImGui.TableSetupColumn("Receiver");
+        ImGui.TableSetupColumn("Found", ImGuiTableColumnFlags.WidthFixed, columnWidths.Found);
+        ImGui.TableSetupColumn("Tier", ImGuiTableColumnFlags.WidthFixed, columnWidths.Tier);
+        ImGui.TableSetupColumn("Location", ImGuiTableColumnFlags.WidthFixed, columnWidths.Location);
+        ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthFixed, columnWidths.Item);
+        ImGui.TableSetupColumn("Finder", ImGuiTableColumnFlags.WidthFixed, columnWidths.Finder);
+        ImGui.TableSetupColumn("Receiver", ImGuiTableColumnFlags.WidthFixed, columnWidths.Receiver);
         ImGui.TableHeadersRow();
 
         foreach (var hint in hints)
@@ -249,6 +254,33 @@ public class MainWindow : Window, IDisposable
         }
 
         ImGui.EndTable();
+    }
+
+    private static HintColumnWidths GetHintColumnWidths(IReadOnlyList<ArchipelagoHintDisplay> hints)
+    {
+        return new HintColumnWidths(
+            GetHintColumnWidth("Found", hints, hint => hint.Found ? "Yes" : "No"),
+            GetHintColumnWidth("Tier", hints, hint => hint.Tier),
+            GetHintColumnWidth("Location", hints, hint => hint.Location),
+            GetHintColumnWidth("Item", hints, hint => hint.Item),
+            GetHintColumnWidth("Finder", hints, hint => hint.Finder),
+            GetHintColumnWidth("Receiver", hints, hint => hint.Receiver));
+    }
+
+    private static float GetHintColumnWidth(
+        string header,
+        IReadOnlyList<ArchipelagoHintDisplay> hints,
+        Func<ArchipelagoHintDisplay, string> getValue)
+    {
+        var padding = (ImGui.GetStyle().CellPadding.X * 2f) + (18f * ImGuiHelpers.GlobalScale);
+        var width = ImGui.CalcTextSize(header).X;
+
+        foreach (var hint in hints)
+        {
+            width = Math.Max(width, ImGui.CalcTextSize(getValue(hint) ?? string.Empty).X);
+        }
+
+        return MathF.Ceiling(width + padding);
     }
 
     private static void DrawHintCell(string value)
@@ -506,4 +538,12 @@ public class MainWindow : Window, IDisposable
     }
 
     private sealed record RollTableDisplay(string Rule, HintRollTable Table);
+
+    private sealed record HintColumnWidths(
+        float Found,
+        float Tier,
+        float Location,
+        float Item,
+        float Finder,
+        float Receiver);
 }
