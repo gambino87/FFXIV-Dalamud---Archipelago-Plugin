@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using ArchipelagoPlugin.Models;
 using ArchipelagoPlugin.Services;
@@ -25,11 +26,21 @@ public class MainWindow : Window, IDisposable
         new("All Dawntrail Savage raids", HintRollTable.DawntrailSavageRaid),
         new("All Dawntrail dungeons", HintRollTable.DawntrailDungeon)
     };
+    private static readonly string[] HintTierFilters =
+    {
+        "All tiers",
+        "Progression",
+        "Useful",
+        "Filler",
+        "Trap"
+    };
 
     private readonly Plugin plugin;
     private readonly SettingsPane settingsPane;
     private bool selectSettingsTab;
     private bool startedInitialHintsRefresh;
+    private bool hideFoundHints;
+    private int selectedHintTierFilterIndex;
 
     public MainWindow(Plugin plugin)
         : base("Archipelago###ArchipelagoPluginMain")
@@ -207,12 +218,62 @@ public class MainWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
-        DrawHintsTable();
+        DrawHintFilters();
+
+        var hints = plugin.Archipelago.CurrentHints;
+        var filteredHints = GetFilteredHints(hints);
+        if (hints.Count > 0 && filteredHints.Count == 0)
+        {
+            ImGui.Spacing();
+            ImGui.TextUnformatted("No hints match the current filters.");
+            return;
+        }
+
+        ImGui.Spacing();
+        DrawHintsTable(filteredHints);
     }
 
-    private void DrawHintsTable()
+    private void DrawHintFilters()
     {
-        var hints = plugin.Archipelago.CurrentHints;
+        ImGui.Checkbox("Hide Found Hints", ref hideFoundHints);
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(160 * ImGuiHelpers.GlobalScale);
+
+        if (ImGui.BeginCombo("Tier", HintTierFilters[selectedHintTierFilterIndex]))
+        {
+            for (var i = 0; i < HintTierFilters.Length; i++)
+            {
+                var selected = i == selectedHintTierFilterIndex;
+                if (ImGui.Selectable(HintTierFilters[i], selected))
+                {
+                    selectedHintTierFilterIndex = i;
+                }
+
+                if (selected)
+                {
+                    ImGui.SetItemDefaultFocus();
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+    }
+
+    private IReadOnlyList<ArchipelagoHintDisplay> GetFilteredHints(IReadOnlyList<ArchipelagoHintDisplay> hints)
+    {
+        var tierFilter = selectedHintTierFilterIndex <= 0
+            ? string.Empty
+            : HintTierFilters[selectedHintTierFilterIndex];
+
+        return hints
+            .Where(hint => !hideFoundHints || !hint.Found)
+            .Where(hint => string.IsNullOrWhiteSpace(tierFilter) ||
+                           hint.Tier.Equals(tierFilter, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    private static void DrawHintsTable(IReadOnlyList<ArchipelagoHintDisplay> hints)
+    {
         if (hints.Count == 0)
         {
             return;
