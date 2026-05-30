@@ -14,9 +14,10 @@ namespace ArchipelagoPlugin.Services;
 
 public sealed class ArchipelagoConnection : IDisposable
 {
-    private static readonly TimeSpan ScoutSearchTimeout = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan ScoutRequestTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan HintRefreshTimeout = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan ScoutSearchTimeout = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan ScoutRequestTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan HintAnnouncementTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan HintRefreshTimeout = TimeSpan.FromSeconds(20);
     private static readonly Version ProtocolVersion = new(0, 6, 7);
     private const int ScoutBatchSize = 50;
 
@@ -401,6 +402,10 @@ public sealed class ArchipelagoConnection : IDisposable
         Version ServerVersion,
         Version ProtocolVersion);
 
+    private sealed record HintAnnouncementResult(
+        ScoutedItemInfo Hint,
+        string StatusMessage);
+
     private static async Task<RoomInfoAttempt> LoadRoomInfoFromAnyAddressAsync(string serverAddress)
     {
         var addresses = GetRoomInfoAddressAttempts(serverAddress);
@@ -491,12 +496,16 @@ public sealed class ArchipelagoConnection : IDisposable
                 return AddHintEvent($"Rolled {roll.Roll} ({roll.RewardType}), but no {roll.RewardType} hint candidates are available for '{objective.Name}'.");
             }
 
-            selectedHint = await CreateAndAnnounceHintForScoutedLocationAsync(activeSession, selectedHint, roll);
+            var announcement = await CreateAndAnnounceHintForScoutedLocationAsync(activeSession, selectedHint, roll);
+            selectedHint = announcement.Hint;
             var display = CreateHintDisplay(activeSession, selectedHint);
             PrintHintToChat(roll, display);
 
             _ = RefreshHintsAsync();
-            return AddHintEvent($"Rolled {roll.Roll} ({roll.RewardType}){Environment.NewLine}{display.Location} -> {display.Item} for {display.Receiver}");
+            var note = string.IsNullOrWhiteSpace(announcement.StatusMessage)
+                ? string.Empty
+                : $"{Environment.NewLine}{announcement.StatusMessage}";
+            return AddHintEvent($"Rolled {roll.Roll} ({roll.RewardType}){Environment.NewLine}{display.Location} -> {display.Item} for {display.Receiver}{note}");
         }
         catch (Exception ex)
         {
@@ -506,7 +515,7 @@ public sealed class ArchipelagoConnection : IDisposable
             }
 
             Plugin.Log.Warning(ex, "Failed to dispatch Archipelago hint.");
-            return AddHintEvent($"Hint failed for '{objective.Name}': {ex.GetBaseException().Message}");
+            return AddHintEvent($"Hint failed for '{objective.Name}': {GetDisplayExceptionMessage(ex)}");
         }
     }
 
@@ -593,23 +602,63 @@ public sealed class ArchipelagoConnection : IDisposable
         }
     }
 
-    private static async Task<ScoutedItemInfo> CreateAndAnnounceHintForScoutedLocationAsync(
+    private static async Task<HintAnnouncementResult> CreateAndAnnounceHintForScoutedLocationAsync(
         ArchipelagoSession activeSession,
         ScoutedItemInfo selectedHint,
         HintRollResult roll)
     {
-        var announced = await WithTimeout(
-            activeSession.Locations.ScoutLocationsAsync(
-                HintCreationPolicy.CreateAndAnnounce,
-                selectedHint.LocationId),
-            ScoutRequestTimeout,
-            "Archipelago hint announcement");
-
-        if (announced.TryGetValue(selectedHint.LocationId, out var announcedHint))
+        string statusMessage;
+        try
         {
-            selectedHint = announcedHint;
+            var announced = await WithTimeout(
+                activeSession.Locations.ScoutLocationsAsync(
+                    HintCreationPolicy.CreateAndAnnounce,
+                    selectedHint.LocationId),
+                HintAnnouncementTimeout,
+                "Archipelago hint announcement");
+
+            if (announced.TryGetValue(selectedHint.LocationId, out var announcedHint))
+            {
+                selectedHint = announcedHint;
+            }
+
+            statusMessage = string.Empty;
+        }
+        catch (TimeoutException ex)
+        {
+            Plugin.Log.Warning(ex, "Timed out waiting for Archipelago to confirm hint announcement.");
+            TryCreateHintWithoutAnnouncement(activeSession, selectedHint, roll);
+            return new HintAnnouncementResult(
+                selectedHint,
+                "Archipelago announcement timed out; fallback hint request was sent.");
         }
 
+        TryUpdateHintStatus(activeSession, selectedHint, roll);
+        return new HintAnnouncementResult(selectedHint, statusMessage);
+    }
+
+    private static void TryCreateHintWithoutAnnouncement(
+        ArchipelagoSession activeSession,
+        ScoutedItemInfo selectedHint,
+        HintRollResult roll)
+    {
+        try
+        {
+            activeSession.Hints.CreateHints(roll.HintStatus, new[] { selectedHint.LocationId });
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "Failed to send Archipelago fallback hint request.");
+        }
+
+        TryUpdateHintStatus(activeSession, selectedHint, roll);
+    }
+
+    private static void TryUpdateHintStatus(
+        ArchipelagoSession activeSession,
+        ScoutedItemInfo selectedHint,
+        HintRollResult roll)
+    {
         try
         {
             activeSession.Hints.UpdateHintStatus(
@@ -621,8 +670,6 @@ public sealed class ArchipelagoConnection : IDisposable
         {
             Plugin.Log.Warning(ex, "Failed to update Archipelago hint status after announcing a hint.");
         }
-
-        return selectedHint;
     }
 
     public async Task RefreshHintsAsync()
@@ -866,6 +913,13 @@ public sealed class ArchipelagoConnection : IDisposable
                 $"{operationName} timed out after {timeout.TotalSeconds:0.#} second(s).",
                 ex);
         }
+    }
+
+    private static string GetDisplayExceptionMessage(Exception ex)
+    {
+        return ex is TimeoutException
+            ? ex.Message
+            : ex.GetBaseException().Message;
     }
 }
 
