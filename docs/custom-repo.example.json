@@ -6,7 +6,7 @@
     "AssemblyVersion": "0.0.0.1",
     "Description": "Connect Final Fantasy XIV duty completions to an Archipelago room by rolling for and revealing Archipelago hints. Use /archipelago or /ap to open the main window.",
     "ApplicableVersion": "any",
-    "RepoUrl": "https://github.com/varga/ArchipelagoPlugin",
+    "RepoUrl": "https://github.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin",
     "Tags": [
       "archipelago",
       "multiworld",
@@ -19,8 +19,8 @@
     "LoadPriority": 0,
     "Punchline": "Connect Final Fantasy XIV to an Archipelago multiworld.",
     "AcceptsFeedback": true,
-    "DownloadLinkInstall": "https://github.com/varga/ArchipelagoPlugin/releases/latest/download/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/varga/ArchipelagoPlugin/releases/latest/download/latest.zip",
-    "DownloadLinkTesting": "https://github.com/varga/ArchipelagoPlugin/releases/latest/download/latest.zip"
+    "DownloadLinkInstall": "https://github.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin/releases/latest/download/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin/releases/latest/download/latest.zip",
+    "DownloadLinkTesting": "https://github.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin/releases/latest/download/latest.zip"
   }
 ]

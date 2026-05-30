@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build plugin
@@ -19,11 +22,19 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Download Dalamud
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive -Force dalamud.zip "$env:APPDATA\XIVLauncher\addon\Hooks\dev\"
+
       - name: Restore
         run: dotnet restore .\ArchipelagoPlugin.sln
 
       - name: Build
         run: dotnet build .\ArchipelagoPlugin.sln -c Release --no-restore
+
+      - name: Prepare custom repository manifest
+        run: Copy-Item .\docs\custom-repo.example.json .\ArchipelagoPlugin\bin\x64\Release\ArchipelagoPlugin\repo.json
 
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
@@ -32,6 +43,7 @@ jobs:
           path: |
             ArchipelagoPlugin/bin/x64/Release/ArchipelagoPlugin/latest.zip
             ArchipelagoPlugin/bin/x64/Release/ArchipelagoPlugin/ArchipelagoPlugin.json
+            ArchipelagoPlugin/bin/x64/Release/ArchipelagoPlugin/repo.json
 
       - name: Publish GitHub release assets
         if: startsWith(github.ref, 'refs/tags/')
@@ -40,3 +52,4 @@ jobs:
           files: |
             ArchipelagoPlugin/bin/x64/Release/ArchipelagoPlugin/latest.zip
             ArchipelagoPlugin/bin/x64/Release/ArchipelagoPlugin/ArchipelagoPlugin.json
+            ArchipelagoPlugin/bin/x64/Release/ArchipelagoPlugin/repo.json

@@ -64,10 +64,16 @@ All Dawntrail dungeons:
 
 ## Requirements
 
+For players:
+
 - FINAL FANTASY XIV launched through XIVLauncher.
 - Dalamud installed and enabled.
-- .NET 10 SDK.
 - An Archipelago room and valid slot credentials.
+
+For developers:
+
+- .NET 10 SDK.
+- A local Dalamud development install from XIVLauncher.
 
 ## Build
 
@@ -117,8 +123,15 @@ pushes and pull requests. When you push a tag such as `v0.1.0`, the workflow als
 uploads the packaged `latest.zip` and generated plugin manifest to the GitHub
 Release.
 
-Players can install through a custom Dalamud repository once you host a repository
-JSON that points to the release ZIP. See:
+Players can install through a custom Dalamud repository once a GitHub Release is
+published. Use this custom repository URL in Dalamud:
+
+```text
+https://github.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin/releases/latest/download/repo.json
+```
+
+The release workflow publishes `repo.json`, which points Dalamud at the packaged
+`latest.zip`. The source template for that repository JSON is:
 
 ```text
 docs/custom-repo.example.json
