@@ -59,7 +59,7 @@ public sealed class MonitorWindow : Window, IDisposable
         {
             if (currentRollTable.IsDisabledDueToUnrestrictedParty)
             {
-                ImGui.TextColored(DisabledTextColor, currentRollTable.DisabledReason);
+                DrawWrappedColoredText(currentRollTable.DisabledReason, DisabledTextColor);
                 return;
             }
 
@@ -129,5 +129,12 @@ public sealed class MonitorWindow : Window, IDisposable
         }
 
         ImGui.TextUnformatted($"{rewardType} {percent}%");
+    }
+
+    private static void DrawWrappedColoredText(string text, Vector4 color)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        ImGui.TextWrapped(text);
+        ImGui.PopStyleColor();
     }
 }

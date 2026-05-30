@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Numerics;
 using ArchipelagoPlugin.Models;
 using Dalamud.Bindings.ImGui;
@@ -120,23 +119,23 @@ public class MainWindow : Window, IDisposable
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
             DrawRollTableText(display.Rule, isActive, isDisabled, true);
-            DrawRollRangeCell(display.Table, HintRewardType.Trap, isActive, isDisabled);
-            DrawRollRangeCell(display.Table, HintRewardType.Filler, isActive, isDisabled);
-            DrawRollRangeCell(display.Table, HintRewardType.Useful, isActive, isDisabled);
-            DrawRollRangeCell(display.Table, HintRewardType.Progression, isActive, isDisabled);
+            DrawRollProbabilityCell(display.Table, HintRewardType.Trap, isActive, isDisabled);
+            DrawRollProbabilityCell(display.Table, HintRewardType.Filler, isActive, isDisabled);
+            DrawRollProbabilityCell(display.Table, HintRewardType.Useful, isActive, isDisabled);
+            DrawRollProbabilityCell(display.Table, HintRewardType.Progression, isActive, isDisabled);
         }
 
         ImGui.EndTable();
     }
 
-    private static void DrawRollRangeCell(
+    private static void DrawRollProbabilityCell(
         HintRollTable table,
         HintRewardType rewardType,
         bool isActive,
         bool isDisabled)
     {
         ImGui.TableNextColumn();
-        DrawRollTableText(FormatRollRanges(table, rewardType), isActive, isDisabled, false);
+        DrawRollTableText(FormatProbability(table, rewardType), isActive, isDisabled, false);
     }
 
     private static void DrawRollTableText(string text, bool isActive, bool isDisabled, bool wrapped)
@@ -161,21 +160,10 @@ public class MainWindow : Window, IDisposable
         }
     }
 
-    private static string FormatRollRanges(HintRollTable table, HintRewardType rewardType)
+    private static string FormatProbability(HintRollTable table, HintRewardType rewardType)
     {
-        var ranges = table.Ranges
-            .Where(range => range.RewardType == rewardType)
-            .Select(FormatRollRange)
-            .ToArray();
-
-        return ranges.Length == 0 ? "-" : string.Join(", ", ranges);
-    }
-
-    private static string FormatRollRange(HintRollRange range)
-    {
-        return range.MinimumRoll == range.MaximumRoll
-            ? range.MinimumRoll.ToString()
-            : $"{range.MinimumRoll}-{range.MaximumRoll}";
+        var percent = table.GetProbabilityPercent(rewardType);
+        return percent <= 0 ? "-" : $"{percent}%";
     }
 
     private void DrawHintsTab()
@@ -365,13 +353,10 @@ public class MainWindow : Window, IDisposable
             ImGui.EndDisabled();
         }
 
-        ImGui.SameLine();
-
         if (ImGui.Button("Monitor", new Vector2(110, 0)))
         {
             plugin.OpenMonitorUi();
         }
-
     }
 
     private void DrawMainRollPanel()
@@ -425,7 +410,7 @@ public class MainWindow : Window, IDisposable
         {
             if (currentRollTable.IsDisabledDueToUnrestrictedParty)
             {
-                ImGui.TextColored(DisabledRollTextColor, currentRollTable.DisabledReason);
+                DrawWrappedColoredText(currentRollTable.DisabledReason, DisabledRollTextColor);
                 return;
             }
 
@@ -511,6 +496,13 @@ public class MainWindow : Window, IDisposable
         }
 
         ImGui.TextUnformatted($"{rewardType} {percent}%");
+    }
+
+    private static void DrawWrappedColoredText(string text, Vector4 color)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        ImGui.TextWrapped(text);
+        ImGui.PopStyleColor();
     }
 
     private sealed record RollTableDisplay(string Rule, HintRollTable Table);
