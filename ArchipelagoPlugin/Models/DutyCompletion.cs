@@ -4,4 +4,5 @@ public sealed record DutyCompletion(
     uint ContentFinderConditionId,
     string DutyName,
     string ContentTypeName,
-    string ContentUiCategoryName);
+    string ContentUiCategoryName,
+    byte ClassJobLevelSync);

@@ -15,6 +15,7 @@ public class MainWindow : Window, IDisposable
 {
     private static readonly Vector4 DisconnectedTextColor = new(1f, 0.35f, 0.25f, 1f);
     private static readonly Vector4 ActiveRollTableTextColor = new(0.3f, 1f, 0.45f, 1f);
+    private static readonly Vector4 DisabledRollTextColor = new(1f, 0.25f, 0.2f, 1f);
     private static readonly RollTableDisplay[] RollTableDisplays =
     {
         new("Default dungeon, trial, or raid", HintRollTable.Default),
@@ -114,30 +115,35 @@ public class MainWindow : Window, IDisposable
         {
             var isActive = currentRollTable != null &&
                            ReferenceEquals(display.Table, currentRollTable.RollTable);
+            var isDisabled = isActive && currentRollTable!.IsDisabledDueToUnrestrictedParty;
 
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
-            DrawRollTableText(display.Rule, isActive, true);
-            DrawRollRangeCell(display.Table, HintRewardType.Trap, isActive);
-            DrawRollRangeCell(display.Table, HintRewardType.Filler, isActive);
-            DrawRollRangeCell(display.Table, HintRewardType.Useful, isActive);
-            DrawRollRangeCell(display.Table, HintRewardType.Progression, isActive);
+            DrawRollTableText(display.Rule, isActive, isDisabled, true);
+            DrawRollRangeCell(display.Table, HintRewardType.Trap, isActive, isDisabled);
+            DrawRollRangeCell(display.Table, HintRewardType.Filler, isActive, isDisabled);
+            DrawRollRangeCell(display.Table, HintRewardType.Useful, isActive, isDisabled);
+            DrawRollRangeCell(display.Table, HintRewardType.Progression, isActive, isDisabled);
         }
 
         ImGui.EndTable();
     }
 
-    private static void DrawRollRangeCell(HintRollTable table, HintRewardType rewardType, bool isActive)
+    private static void DrawRollRangeCell(
+        HintRollTable table,
+        HintRewardType rewardType,
+        bool isActive,
+        bool isDisabled)
     {
         ImGui.TableNextColumn();
-        DrawRollTableText(FormatRollRanges(table, rewardType), isActive, false);
+        DrawRollTableText(FormatRollRanges(table, rewardType), isActive, isDisabled, false);
     }
 
-    private static void DrawRollTableText(string text, bool isActive, bool wrapped)
+    private static void DrawRollTableText(string text, bool isActive, bool isDisabled, bool wrapped)
     {
         if (isActive)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ActiveRollTableTextColor);
+            ImGui.PushStyleColor(ImGuiCol.Text, isDisabled ? DisabledRollTextColor : ActiveRollTableTextColor);
         }
 
         if (wrapped)
@@ -414,12 +420,20 @@ public class MainWindow : Window, IDisposable
             return;
         }
 
-        ImGui.TextUnformatted("Waiting...");
         var currentRollTable = plugin.ObjectiveMonitor.GetCurrentDutyRollTable();
         if (currentRollTable != null)
         {
+            if (currentRollTable.IsDisabledDueToUnrestrictedParty)
+            {
+                ImGui.TextColored(DisabledRollTextColor, currentRollTable.DisabledReason);
+                return;
+            }
+
             DrawProbabilities(currentRollTable.RollTable);
+            return;
         }
+
+        ImGui.TextUnformatted("Waiting...");
     }
 
     private static void DrawFfxivState()

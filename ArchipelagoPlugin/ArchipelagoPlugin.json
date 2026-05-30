@@ -4,6 +4,7 @@
   "Punchline": "Connect Final Fantasy XIV to an Archipelago multiworld.",
   "Description": "Connect Final Fantasy XIV duty completions to an Archipelago room by rolling for and revealing Archipelago hints. Use /archipelago or /ap to open the main window.",
   "RepoUrl": "https://github.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin",
+  "IconUrl": "https://raw.githubusercontent.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin/main/assets/plugin-icon.png",
   "ApplicableVersion": "any",
   "Tags": [
     "archipelago",

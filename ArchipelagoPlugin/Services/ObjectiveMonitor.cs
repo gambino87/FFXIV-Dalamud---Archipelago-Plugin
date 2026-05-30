@@ -74,7 +74,11 @@ public sealed class ObjectiveMonitor : IDisposable
         }
 
         return ObjectiveDefaults.CreateObjectives().Any(objective => MatchesObjective(objective, completion))
-            ? new CurrentDutyRollTable(completion.DutyName, GetRollTable(completion))
+            ? new CurrentDutyRollTable(
+                completion.DutyName,
+                GetRollTable(completion),
+                IsDisabledDueToUnrestrictedParty(completion),
+                "Disabled due to Unrestricted Party")
             : null;
     }
 
@@ -96,6 +100,14 @@ public sealed class ObjectiveMonitor : IDisposable
             }
 
             matchedAnyObjective = true;
+            if (IsDisabledDueToUnrestrictedParty(completion))
+            {
+                var disabledMessage = $"Ignored completed duty due to Unrestricted Party: {FormatDutyDetails(completion)}";
+                AddRecentEvent(disabledMessage);
+                Plugin.Log.Information(disabledMessage);
+                continue;
+            }
+
             CompleteObjective(objective, FormatDutyDetails(completion), GetRollTable(completion));
         }
 
@@ -122,7 +134,8 @@ public sealed class ObjectiveMonitor : IDisposable
             condition.RowId,
             condition.Name.ToString(),
             GetRowName(condition.ContentType),
-            GetRowName(condition.ContentUICategory));
+            GetRowName(condition.ContentUICategory),
+            condition.ClassJobLevelSync);
     }
 
     private static bool MatchesObjective(ObjectiveDefinition objective, DutyCompletion completion)
@@ -257,6 +270,18 @@ public sealed class ObjectiveMonitor : IDisposable
                completion.ContentUiCategoryName.Contains(text, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsDisabledDueToUnrestrictedParty(DutyCompletion completion)
+    {
+        var playerState = Plugin.PlayerState;
+        if (!playerState.IsLoaded || completion.ClassJobLevelSync == 0)
+        {
+            return false;
+        }
+
+        return playerState.Level > completion.ClassJobLevelSync &&
+               !playerState.IsLevelSynced;
+    }
+
     private void CompleteObjective(
         ObjectiveDefinition objective,
         string details,
@@ -294,4 +319,8 @@ public sealed class ObjectiveMonitor : IDisposable
     }
 }
 
-public sealed record CurrentDutyRollTable(string DutyName, HintRollTable RollTable);
+public sealed record CurrentDutyRollTable(
+    string DutyName,
+    HintRollTable RollTable,
+    bool IsDisabledDueToUnrestrictedParty,
+    string DisabledReason);

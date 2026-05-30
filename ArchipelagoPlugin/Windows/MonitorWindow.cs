@@ -9,6 +9,7 @@ namespace ArchipelagoPlugin.Windows;
 public sealed class MonitorWindow : Window, IDisposable
 {
     private static readonly Vector4 DisconnectedTextColor = new(1f, 0.35f, 0.25f, 1f);
+    private static readonly Vector4 DisabledTextColor = new(1f, 0.25f, 0.2f, 1f);
 
     private readonly Plugin plugin;
 
@@ -53,12 +54,21 @@ public sealed class MonitorWindow : Window, IDisposable
             return;
         }
 
-        ImGui.TextUnformatted("Waiting....");
         var currentRollTable = plugin.ObjectiveMonitor.GetCurrentDutyRollTable();
         if (currentRollTable != null)
         {
+            if (currentRollTable.IsDisabledDueToUnrestrictedParty)
+            {
+                ImGui.TextColored(DisabledTextColor, currentRollTable.DisabledReason);
+                return;
+            }
+
+            ImGui.TextUnformatted("Waiting....");
             DrawProbabilities(currentRollTable.RollTable);
+            return;
         }
+
+        ImGui.TextUnformatted("Waiting....");
     }
 
     private static void DrawRolling(Services.HintRollDisplaySnapshot roll)
