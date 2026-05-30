@@ -754,8 +754,9 @@ public sealed class ArchipelagoConnection : IDisposable
 
     private static void PrintHintToChat(HintRollResult roll, ArchipelagoHintDisplay display)
     {
+        var hintClass = display.Tier.ToLowerInvariant();
         Plugin.ChatGui.Print(
-            $"[Archipelago] Roll {roll.Roll} ({roll.RewardType}) hint: Location: {display.Location} | Item: {display.Item} | Finder: {display.Finder} | Receiver: {display.Receiver}");
+            $"[Archipelago] Rolled {roll.Roll}. Received {hintClass} hint: {display.Location} | {display.Item} | {display.Finder} | {display.Receiver}");
     }
 
     private static ArchipelagoHintDisplay CreateHintDisplay(ArchipelagoSession activeSession, Hint hint)
