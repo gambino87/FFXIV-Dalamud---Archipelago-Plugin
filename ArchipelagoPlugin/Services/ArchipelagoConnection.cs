@@ -481,13 +481,17 @@ public sealed class ArchipelagoConnection : IDisposable
 
         try
         {
-            var selectedHint = await SelectRandomScoutedHintAsync(activeSession, roll.RewardType);
+            var knownHintedLocationIds = await GetKnownHintedLocationIdsAsync(activeSession);
+            var selectedHint = await SelectRandomScoutedHintAsync(
+                activeSession,
+                roll.RewardType,
+                knownHintedLocationIds);
             if (selectedHint == null)
             {
                 return AddHintEvent($"Rolled {roll.Roll} ({roll.RewardType}), but no {roll.RewardType} hint candidates are available for '{objective.Name}'.");
             }
 
-            CreateHintForScoutedLocation(activeSession, selectedHint, roll);
+            selectedHint = await CreateAndAnnounceHintForScoutedLocationAsync(activeSession, selectedHint, roll);
             var display = CreateHintDisplay(activeSession, selectedHint);
             PrintHintToChat(roll, display);
 
@@ -508,7 +512,8 @@ public sealed class ArchipelagoConnection : IDisposable
 
     private static async Task<ScoutedItemInfo?> SelectRandomScoutedHintAsync(
         ArchipelagoSession activeSession,
-        HintRewardType rewardType)
+        HintRewardType rewardType,
+        IReadOnlySet<long> knownHintedLocationIds)
     {
         var missingLocations = activeSession.Locations.AllMissingLocations
             .OrderBy(_ => Random.Shared.Next())
@@ -521,6 +526,7 @@ public sealed class ArchipelagoConnection : IDisposable
 
         var timeoutAt = DateTime.UtcNow.Add(ScoutSearchTimeout);
         var searchedLocationCount = 0;
+        ScoutedItemInfo? alreadyHintedCandidate = null;
         foreach (var batch in missingLocations.Chunk(ScoutBatchSize))
         {
             var remaining = timeoutAt - DateTime.UtcNow;
@@ -542,21 +548,81 @@ public sealed class ArchipelagoConnection : IDisposable
             var candidates = scouted.Values
                 .Where(item => GetRewardTypeForFlags(item.Flags) == rewardType)
                 .ToArray();
-            if (candidates.Length > 0)
+            var unhintedCandidates = candidates
+                .Where(item => !knownHintedLocationIds.Contains(item.LocationId))
+                .ToArray();
+
+            if (unhintedCandidates.Length > 0)
             {
-                return candidates[Random.Shared.Next(candidates.Length)];
+                return unhintedCandidates[Random.Shared.Next(unhintedCandidates.Length)];
+            }
+
+            if (alreadyHintedCandidate == null && candidates.Length > 0)
+            {
+                alreadyHintedCandidate = candidates[Random.Shared.Next(candidates.Length)];
             }
         }
 
-        return null;
+        return alreadyHintedCandidate;
     }
 
-    private static void CreateHintForScoutedLocation(
+    private static async Task<HashSet<long>> GetKnownHintedLocationIdsAsync(ArchipelagoSession activeSession)
+    {
+        try
+        {
+            var activePlayer = activeSession.Players.ActivePlayer;
+            var hintTasks = activeSession.Players.AllPlayers
+                .Where(player => player.Team == activePlayer.Team && player.Slot > 0)
+                .Select(player => activeSession.Hints.GetHintsAsync(player.Slot, player.Team))
+                .ToArray();
+            var hintSets = await WithTimeout(
+                Task.WhenAll(hintTasks),
+                HintRefreshTimeout,
+                "Archipelago known hint lookup");
+
+            return hintSets
+                .Where(entries => entries != null)
+                .SelectMany(entries => entries)
+                .Select(hint => hint.LocationId)
+                .ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "Failed to load known Archipelago hints before choosing a hint.");
+            return new HashSet<long>();
+        }
+    }
+
+    private static async Task<ScoutedItemInfo> CreateAndAnnounceHintForScoutedLocationAsync(
         ArchipelagoSession activeSession,
         ScoutedItemInfo selectedHint,
         HintRollResult roll)
     {
-        activeSession.Hints.CreateHints(roll.HintStatus, new[] { selectedHint.LocationId });
+        var announced = await WithTimeout(
+            activeSession.Locations.ScoutLocationsAsync(
+                HintCreationPolicy.CreateAndAnnounce,
+                selectedHint.LocationId),
+            ScoutRequestTimeout,
+            "Archipelago hint announcement");
+
+        if (announced.TryGetValue(selectedHint.LocationId, out var announcedHint))
+        {
+            selectedHint = announcedHint;
+        }
+
+        try
+        {
+            activeSession.Hints.UpdateHintStatus(
+                activeSession.Players.ActivePlayer.Slot,
+                selectedHint.LocationId,
+                roll.HintStatus);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "Failed to update Archipelago hint status after announcing a hint.");
+        }
+
+        return selectedHint;
     }
 
     public async Task RefreshHintsAsync()

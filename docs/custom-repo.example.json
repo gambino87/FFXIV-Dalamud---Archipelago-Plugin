@@ -3,7 +3,7 @@
     "Author": "varga",
     "Name": "Archipelago Plugin",
     "InternalName": "ArchipelagoPlugin",
-    "AssemblyVersion": "0.0.0.1",
+    "AssemblyVersion": "0.0.0.2",
     "Description": "Connect Final Fantasy XIV duty completions to an Archipelago room by rolling for and revealing Archipelago hints. Use /archipelago or /ap to open the main window.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/gambino87/FFXIV-Dalamud---Archipelago-Plugin",
